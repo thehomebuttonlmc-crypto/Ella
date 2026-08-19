@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import requests
 import telebot
 from flask import Flask
@@ -8,11 +9,10 @@ from threading import Thread
 
 # --- CREDENTIAL CONFIGURATIONS ---
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
-# Your working Groq API key
 GROQ_API_KEY = "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" 
 
-# Initialize Engines
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+# Initialize Engines (threaded=False blocks parallel processing loops)
+bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
 # --- SYSTEM PERSONA CONFIGURATION ---
@@ -86,7 +86,22 @@ def run_flask_bridge():
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
+    # Force Telegram to flush out all stuck web hook configurations
     bot.remove_webhook()
+    
+    # Fire up the background port helper
     Thread(target=run_flask_bridge).start()
     print("Bot is successfully polling on Render cloud infrastructure...")
-    bot.infinity_polling()
+    
+    # FIXED: Replaced standard infinity polling with a high-offset short loop.
+    # This forces Telegram to instantly kill old worker connections as soon as a new message hits the server.
+    offset = 0
+    while True:
+        try:
+            updates = bot.get_updates(offset=offset, timeout=10, allowed_updates=["message"])
+            for update in updates:
+                bot.process_new_updates([update])
+                offset = update.update_id + 1
+        except Exception as e:
+            # If a 409 conflict hits, pause for 2 seconds and retry cleanly without crashing the container
+            time.sleep(2)
