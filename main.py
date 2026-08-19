@@ -11,7 +11,7 @@ from threading import Thread
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GROQ_API_KEY = "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" 
 
-# Initialize Engines (threaded=False prevents server threading conflicts)
+# Initialize Engines (threaded=False prevents background processing loop conflicts)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to the unblocked Groq API endpoint using the verified model identifier string."""
+    """Sends requests directly to the unblocked Groq API endpoint using the updated active model."""
     url = "https://groq.com"
     
     if user_id not in user_histories:
@@ -41,9 +41,9 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Hardcoded the exact, official Groq model string name to ensure instant generation acceptance
+    # FIXED: Replaced the dead llama model identifier string with Groq's active unblocked replacement model
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "messages": user_histories[user_id],
         "temperature": 0.9,
         "max_tokens": 100
