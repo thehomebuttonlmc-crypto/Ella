@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import requests
 import telebot
 from flask import Flask
@@ -7,9 +8,10 @@ from threading import Thread
 
 # --- CREDENTIAL CONFIGURATIONS ---
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
-GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
+# Your working Groq API key
+GROQ_API_KEY = "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" 
 
-# Initialize standard Telegram and Web engines
+# Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
@@ -30,34 +32,34 @@ SYSTEM_PROMPT = (
 
 user_histories = {}
 
-def ask_gemini_direct_raw(user_id, new_message):
-    """Sends requests directly to Gemini endpoints using raw web requests to bypass library credential bugs."""
-    url = f"https://googleapis.com{GEMINI_API_KEY}"
+def ask_groq_direct(user_id, new_message):
+    """Sends requests directly to the unblocked Groq API endpoint."""
+    url = "https://groq.com"
     
     if user_id not in user_histories:
-        user_histories[user_id] = []
+        user_histories[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
         
-    user_histories[user_id].append({"role": "user", "parts": [{"text": new_message}]})
+    user_histories[user_id].append({"role": "user", "content": new_message})
     
     payload = {
-        "contents": user_histories[user_id],
-        "systemInstruction": {
-            "parts": [{"text": SYSTEM_PROMPT}]
-        },
-        "generationConfig": {
-            "temperature": 0.9,
-            "maxOutputTokens": 100
-        }
+        "model": "llama-3.1-8b-instant",
+        "messages": user_histories[user_id],
+        "temperature": 0.9,
+        "max_tokens": 100
     }
     
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GROQ_API_KEY}"
+    }
+    
     response = requests.post(url, json=payload, headers=headers, timeout=20)
     
     if response.status_code == 200:
         res_json = response.json()
         try:
-            bot_reply = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
-            user_histories[user_id].append({"role": "model", "parts": [{"text": bot_reply}]})
+            bot_reply = res_json['choices']['message']['content'].strip()
+            user_histories[user_id].append({"role": "assistant", "content": bot_reply})
             return bot_reply
         except (KeyError, IndexError, TypeError):
             raise Exception(f"Unexpected JSON structure: {res_json}")
@@ -73,7 +75,7 @@ def home():
 def handle_message(message):
     try:
         user_id = message.from_user.id
-        reply_text = ask_gemini_direct_raw(user_id, message.text)
+        reply_text = ask_groq_direct(user_id, message.text)
         bot.reply_to(message, reply_text)
     except Exception as e:
         print(f"DESKTOP RUNTIME ERROR: {e}", file=sys.stderr)
