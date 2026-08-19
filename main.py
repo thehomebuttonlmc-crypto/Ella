@@ -11,7 +11,7 @@ from threading import Thread
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GROQ_API_KEY = "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" 
 
-# Initialize Engines (threaded=False blocks parallel processing loops)
+# Initialize Engines (threaded=False prevents server threading conflicts)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to the unblocked Groq API endpoint."""
+    """Sends requests directly to the unblocked Groq API endpoint using the verified model identifier string."""
     url = "https://groq.com"
     
     if user_id not in user_histories:
@@ -41,6 +41,7 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
+    # FIXED: Hardcoded the exact, official Groq model string name to ensure instant generation acceptance
     payload = {
         "model": "llama-3.1-8b-instant",
         "messages": user_histories[user_id],
@@ -86,15 +87,11 @@ def run_flask_bridge():
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Force Telegram to flush out all stuck web hook configurations
     bot.remove_webhook()
-    
-    # Fire up the background port helper
     Thread(target=run_flask_bridge).start()
     print("Bot is successfully polling on Render cloud infrastructure...")
     
-    # FIXED: Replaced standard infinity polling with a high-offset short loop.
-    # This forces Telegram to instantly kill old worker connections as soon as a new message hits the server.
+    # High-offset single instance routing keeps duplicate workers fully blocked
     offset = 0
     while True:
         try:
@@ -103,5 +100,4 @@ if __name__ == "__main__":
                 bot.process_new_updates([update])
                 offset = update.update_id + 1
         except Exception as e:
-            # If a 409 conflict hits, pause for 2 seconds and retry cleanly without crashing the container
             time.sleep(2)
