@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to the unblocked Groq API endpoint using a verified model identifier string."""
+    """Sends requests directly to Groq's official API path without proxy path mapping errors."""
     url = "https://groq.com"
     
     if user_id not in user_histories:
@@ -58,7 +58,6 @@ def ask_groq_direct(user_id, new_message):
     if response.status_code == 200:
         res_json = response.json()
         try:
-            # FIXED: Added the explicit array selection indicator [0] so Python reads the data array cleanly
             bot_reply = res_json['choices'][0]['message']['content'].strip()
             user_histories[user_id].append({"role": "assistant", "content": bot_reply})
             return bot_reply
@@ -91,7 +90,6 @@ if __name__ == "__main__":
     Thread(target=run_flask_bridge).start()
     print("Bot is successfully polling on Render cloud infrastructure...")
     
-    # High-offset single instance routing keeps duplicate workers fully blocked
     offset = 0
     while True:
         try:
