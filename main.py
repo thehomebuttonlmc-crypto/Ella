@@ -59,7 +59,7 @@ def ask_groq_direct(user_id, new_message):
     if response.status_code == 200:
         res_json = response.json()
         try:
-            bot_reply = res_json['choices']['message']['content'].strip()
+            bot_reply = res_json['choices'][0]['message']['content'].strip()
             user_histories[user_id].append({"role": "assistant", "content": bot_reply})
             return bot_reply
         except (KeyError, IndexError, TypeError):
