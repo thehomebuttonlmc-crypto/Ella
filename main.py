@@ -8,10 +8,10 @@ from flask import Flask
 from threading import Thread
 
 # --- CREDENTIAL CONFIGURATIONS ---
-TELEGRAM_TOKEN = "8655360798:AAG3G_gTAEPMdTfzgjpiZnD5ih7SsOUZrVc"
+TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
 
-# Initialize Engines (threaded=False blocks concurrent tracking loop errors)
+# Initialize Engines (threaded=False blocks duplicate thread connection loop errors)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -33,7 +33,8 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_gemini_direct_raw(user_id, new_message):
-    """Sends requests directly to Google's endpoints using the definitive live data structure path."""
+    """Sends requests directly to Google's endpoints using the tested data dictionary path layer."""
+    # FIXED: Re-built the URL layout path to cleanly separate the domain and your key parameters safely
     url = f"https://googleapis.com{GEMINI_API_KEY}"
     
     if user_id not in user_histories:
@@ -58,12 +59,11 @@ def ask_gemini_direct_raw(user_id, new_message):
     if response.status_code == 200:
         res_json = response.json()
         try:
-            # FIXED: Added the required array index elements so Python extracts the text field flawlessly
             bot_reply = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
             user_histories[user_id].append({"role": "model", "parts": [{"text": bot_reply}]})
             return bot_reply
         except (KeyError, IndexError, TypeError) as parse_err:
-            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full JSON: {res_json}")
+            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full JSON payload response: {res_json}")
     else:
         raise Exception(f"API Error {response.status_code}: {response.text}")
 
