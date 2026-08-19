@@ -8,7 +8,7 @@ from flask import Flask
 from threading import Thread
 
 # --- CREDENTIAL CONFIGURATIONS ---
-TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
+TELEGRAM_TOKEN = "8655360798:AAG3G_gTAEPMdTfzgjpiZnD5ih7SsOUZrVc"
 GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
 
 # Initialize Engines (threaded=False blocks concurrent tracking loop errors)
