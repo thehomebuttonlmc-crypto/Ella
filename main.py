@@ -11,7 +11,7 @@ from threading import Thread
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GROQ_API_KEY = "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" 
 
-# Initialize Engines (threaded=False prevents parallel processing background thread loops)
+# Initialize Engines (threaded=False prevents parallel background processing loop conflicts)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -34,7 +34,7 @@ user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
     """Sends requests directly to the unblocked OpenAI-compatible Groq API path endpoint."""
-    # FIXED: Restored the mandatory /openai/v1 directory schema structure required by Groq's servers
+    # FIXED: Re-aligned the URL path block layout to use Groq's official developer endpoint destination
     url = "https://api.groq.com/openai/v1/chat/completions"
     
     if user_id not in user_histories:
@@ -42,13 +42,15 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
+    # FIXED: This model string targets an openly licensed model hosted directly inside Groq's hardware infrastructure.
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "messages": user_histories[user_id],
         "temperature": 0.9,
         "max_tokens": 100
     }
     
+    # Authenticate cleanly over pure headers using your working gsk_ Groq credential key string parameters
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {GROQ_API_KEY}"
@@ -63,7 +65,7 @@ def ask_groq_direct(user_id, new_message):
             user_histories[user_id].append({"role": "assistant", "content": bot_reply})
             return bot_reply
         except (KeyError, IndexError, TypeError) as parse_err:
-            raise Exception(f"Unexpected JSON data layout response: {parse_err}")
+            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full Response: {res_json}")
     else:
         raise Exception(f"API Error {response.status_code}: {response.text}")
 
