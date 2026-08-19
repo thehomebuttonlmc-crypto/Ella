@@ -11,7 +11,7 @@ from threading import Thread
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GROQ_API_KEY = "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" 
 
-# Initialize Engines (threaded=False blocks parallel duplicate thread loop conflicts)
+# Initialize Engines (threaded=False prevents parallel processing background thread loops)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -33,8 +33,9 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq's official API path without proxy path mapping errors."""
-    url = "https://groq.com"
+    """Sends requests directly to the unblocked OpenAI-compatible Groq API path endpoint."""
+    # FIXED: Restored the mandatory /openai/v1 directory schema structure required by Groq's servers
+    url = "https://api.groq.com/openai/v1/chat/completions"
     
     if user_id not in user_histories:
         user_histories[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
