@@ -11,7 +11,7 @@ GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
 
 # Initialize standard clients natively with zero network proxy barriers
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY, transport='rest')
 app = Flask(__name__)
 
 # --- SYSTEM PERSONA CONFIGURATION ---
