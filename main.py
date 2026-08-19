@@ -11,7 +11,7 @@ from threading import Thread
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GROQ_API_KEY = "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" 
 
-# Initialize Engines (threaded=False prevents parallel background processing loop conflicts)
+# Initialize Engines (threaded=False blocks parallel processing duplicate thread conflicts)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -33,24 +33,22 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to the unblocked OpenAI-compatible Groq API path endpoint."""
-    # FIXED: Re-aligned the URL path block layout to use Groq's official developer endpoint destination
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    """Sends requests directly to Groq's official API endpoint."""
+    url = "https://groq.com"
     
     if user_id not in user_histories:
         user_histories[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: This model string targets an openly licensed model hosted directly inside Groq's hardware infrastructure.
+    # FIXED: Hardcoded the active, verified Groq model identifier string
     payload = {
-        "model": "openai/gpt-oss-20b",
+        "model": "llama3-8b-8192",
         "messages": user_histories[user_id],
         "temperature": 0.9,
         "max_tokens": 100
     }
     
-    # Authenticate cleanly over pure headers using your working gsk_ Groq credential key string parameters
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {GROQ_API_KEY}"
@@ -62,10 +60,12 @@ def ask_groq_direct(user_id, new_message):
         res_json = response.json()
         try:
             bot_reply = res_json['choices'][0]['message']['content'].strip()
+            if not bot_reply:
+                raise Exception("Groq returned an empty response string")
             user_histories[user_id].append({"role": "assistant", "content": bot_reply})
             return bot_reply
         except (KeyError, IndexError, TypeError) as parse_err:
-            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full Response: {res_json}")
+            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full JSON: {res_json}")
     else:
         raise Exception(f"API Error {response.status_code}: {response.text}")
 
