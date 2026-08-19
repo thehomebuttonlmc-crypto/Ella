@@ -3,15 +3,16 @@ import sys
 from threading import Thread
 import telebot
 from flask import Flask
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # --- SECURE CREDENTIAL ROUTING MODULE ---
 TELEGRAM_TOKEN = "8725890129:AAEDVpchrkS2vd54fquwZmbINzzDZ5Gr8qk"
 GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
 
-# Initialize standard clients natively with zero network proxy barriers
+# Initialize standard clients natively using the modern GenAI library
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
-genai.configure(api_key=GEMINI_API_KEY, transport='rest')
+client = genai.Client(api_key=GEMINI_API_KEY)
 app = Flask(__name__)
 
 # --- SYSTEM PERSONA CONFIGURATION ---
@@ -29,10 +30,11 @@ SYSTEM_PROMPT = (
     "5. Keep responses short and conversational, usually 1 to 3 quick sentences max."
 )
 
-generation_config = {
-    "temperature": 0.9,
-    "max_output_tokens": 100,
-}
+generation_config = types.GenerateContentConfig(
+    temperature=0.9,
+    max_output_tokens=100,
+    system_instruction=SYSTEM_PROMPT
+)
 
 user_chats = {}
 
@@ -47,13 +49,12 @@ def handle_message(message):
     try:
         user_id = message.from_user.id
         
-        # Open continuous chat loops natively without token reading errors
+        # Open continuous chat loops natively with the modern SDK framework
         if user_id not in user_chats:
-            user_chats[user_id] = genai.GenerativeModel(
-                model_name='gemini-1.5-flash',
-                generation_config=generation_config,
-                system_instruction=SYSTEM_PROMPT
-            ).start_chat(history=[])
+            user_chats[user_id] = client.chats.create(
+                model='gemini-2.5-flash',
+                config=generation_config
+            )
 
         chat = user_chats[user_id]
         response = chat.send_message(message.text)
@@ -63,12 +64,10 @@ def handle_message(message):
         bot.reply_to(message, "hey sorry, my phone is acting up rn...")
 
 def run_flask_bridge():
-    # Render feeds a temporary dynamic port automatically to keep web endpoints safe
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Force clean connection mapping configurations
     bot.remove_webhook()
     
     # Fire up the background port helper
