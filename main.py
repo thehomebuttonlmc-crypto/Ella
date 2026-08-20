@@ -8,17 +8,12 @@ from flask import Flask
 from threading import Thread
 from groq import Groq
 
-# --- CREDENTIAL CONFIGURATIONS ---
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# --- FORCE SANITIZED CREDENTIALS ---
+# This explicitly strips spaces out of the string token directly
+TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E".replace(" ", "").strip()
 
-# The .strip() at the end removes any accidental spaces causing the crash
-if not TELEGRAM_TOKEN:
-    TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E".strip()
-
-if not GROQ_API_KEY:
-    # Make sure to replace this placeholder string with your real gsk_ key!
-    GROQ_API_KEY = "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".strip()
+# Paste your real Groq API key here (starts with gsk_)
+GROQ_API_KEY = "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".replace(" ", "").strip()
 
 # Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
@@ -88,9 +83,8 @@ def handle_all_messages(message):
 def home():
     return "Bot running smoothly on Groq engine!"
 
-# --- FIXED BROADCAST METHOD FOR GUNICORN RUNTIME ---
 def start_bot_polling():
-    """Wipes webhook conflicts and continuously polls Telegram for updates in a separate thread context."""
+    """Wipes webhook conflicts and continuously polls Telegram for updates."""
     print("Telegram polling thread starting safely...")
     try:
         bot.remove_webhook()
@@ -104,11 +98,10 @@ def start_bot_polling():
             print(f"Polling loop crash caught: {e}")
             time.sleep(5)
 
-# FIXED: Spawn the listener directly during Flask loading sequence instead of inside __main__
+# Spawn the background worker thread
 polling_thread = Thread(target=start_bot_polling)
 polling_thread.daemon = True
 polling_thread.start()
 
-# Fallback hook mapping block for local execution run checks
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
