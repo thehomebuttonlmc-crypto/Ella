@@ -12,11 +12,13 @@ from groq import Groq
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
+# The .strip() at the end removes any accidental spaces causing the crash
 if not TELEGRAM_TOKEN:
-    TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E"
+    TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E".strip()
 
 if not GROQ_API_KEY:
-    GROQ_API_KEY = "YOUR_REAL_GROQ_API_KEY_HERE" # Paste your gsk_ key string here
+    # Make sure to replace this placeholder string with your real gsk_ key!
+    GROQ_API_KEY = "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".strip()
 
 # Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
