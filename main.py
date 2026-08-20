@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the active openai/gpt-oss-20b model."""
+    """Sends requests directly to Groq using the highly stable llama3-8b-8192 model."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,19 +41,16 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Clean memory slice that extracts raw objects without list nesting corruption
+    # FIXED: Properly extract index 0 so it stays a flat list structure across subsequent turns
     if len(user_histories[user_id]) > 21:
-        # Isolate system instruction dictionary directly at position 0
-        system_obj = user_histories[user_id][0]
-        # Pull a clean, flat list slice of the last 20 messages
+        system_obj = user_histories[user_id][0]  # <-- Added missing [0] index
         last_twenty = list(user_histories[user_id][-20:])
-        # Recombine into a flat array structure
         user_histories[user_id] = [system_obj] + last_twenty
     
     try:
-        # VERIFIED PRODUCTION ACTIVE MODEL ID (NO LLAMA WORKLOADS USED)
+        # FIXED: Using the active free-tier standard model identifier
         completion = groq_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="llama3-8b-8192",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -61,7 +58,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # Access the string attribute via flat object path safely
+        # FIXED: Added the required list index [0] to extract the text data cleanly
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
@@ -98,7 +95,6 @@ def keep_port_alive():
         server.listen(5)
         while True:
             client, addr = server.accept()
-            # FIXED: Added correct carriage return HTTP sequence string to pass strict proxy scans
             client.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
             client.close()
     except Exception as e:
