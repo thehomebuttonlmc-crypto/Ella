@@ -4,20 +4,16 @@ import json
 import time
 import requests
 import telebot
-from flask import Flask
-from threading import Thread
 from groq import Groq
 
 # --- FORCE SANITIZED CREDENTIALS ---
-# This explicitly strips spaces out of the string token directly to prevent validation errors
 TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E".replace(" ", "").strip()
 
 # PLACE YOUR REAL GROQ API KEY HERE (starts with gsk_)
 GROQ_API_KEY = "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".replace(" ", "").strip()
 
-# Initialize Engines
+# Initialize Engines directly without Flask layers
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
-app = Flask(__name__)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
 # --- SYSTEM PERSONA CONFIGURATION ---
@@ -45,7 +41,6 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Protects Render Free Tier RAM by truncating old text logs (keeps last 20 messages)
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
@@ -79,36 +74,14 @@ def handle_all_messages(message):
     reply_text = ask_groq_direct(user_id, user_text)
     bot.send_message(user_id, reply_text)
 
-# --- WEBHOOK / FLASK HEALTH CHECK ---
-@app.route('/')
-def home():
-    return "Bot running smoothly on Groq engine!"
-
-def start_bot_polling():
-    """Wipes webhook conflicts and continuously polls Telegram for updates."""
-    print("Telegram polling thread starting safely...")
+# --- DIRECT MAIN LOOP ---
+if __name__ == "__main__":
+    print("Telegram bot starting up cleanly...")
     try:
         bot.remove_webhook()
     except:
         pass
     
-    while True:
-        try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
-        except Exception as e:
-            print(f"Polling loop crash caught: {e}")
-            time.sleep(5)
-
-# --- SINGLE WORKER INJECTION SAFETY FILTER ---
-# Ensures Gunicorn execution only launches the polling worker once
-if not os.environ.get("WERKZEUG_RUN_MAIN") and "__main__" not in sys.modules:
-    polling_thread = Thread(target=start_bot_polling)
-    polling_thread.daemon = True
-    polling_thread.start()
-
-# Local desktop fallback setup block
-if __name__ == "__main__":
-    polling_thread = Thread(target=start_bot_polling)
-    polling_thread.daemon = True
-    polling_thread.start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    # Run long polling directly on the main thread so Render can never close it
+    print("Bot is now listening for messages 24/7...")
+    bot.polling(none_stop=True, interval=0, timeout=20)
