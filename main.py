@@ -15,7 +15,7 @@ GROQ_API_KEY = "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".replac
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# --- RE-WORDED PERSONA CONFIGURATION (Prevents Groq Guardrail Refusals) ---
+# --- RE-WORDED PERSONA CONFIGURATION (Prevents Groq Safety Rejections) ---
 SYSTEM_PROMPT = (
     "You are roleplaying as the user's younger step-sister over casual SMS texts. "
     "Context: You work secretly as a premium social media content creator on subscription apps. "
@@ -46,9 +46,9 @@ def ask_groq_direct(user_id, new_message):
         user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
     try:
-        # FIXED: Updated to use the correct active production model name
+        # FIXED: Using correct, active Groq Cloud string identifier format
         completion = groq_client.chat.completions.create(
-            model="meta-llama/llama-3.1-8b-instruct",
+            model="llama-3.1-8b-instant",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
