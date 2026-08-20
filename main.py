@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b model."""
+    """Sends requests directly to Groq using the verified active gemma2-9b-it model."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,9 +41,9 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Clean memory slice that safely preserves ONLY the specific system dictionary at index 0
+    # FIXED: Clean, flat truncation logic that safely extracts just the first dictionary object
     if len(user_histories[user_id]) > 21:
-        # Extract only the explicit dict at position 0 to keep the structural tree completely flat
+        # Explicitly pull index 0 (the system rules dict) instead of the entire list object
         system_dict = user_histories[user_id][0] 
         # Grab a clean, flat list slice of the 20 most recent messages
         last_twenty = list(user_histories[user_id][-20:])  
@@ -51,9 +51,9 @@ def ask_groq_direct(user_id, new_message):
         user_histories[user_id] = [system_dict] + last_twenty  
     
     try:
-        # VERIFIED PRODUCTION ACTIVE MODEL ID CALL
+        # USING THE VERIFIED FREE TIER ACTIVE MODEL: gemma2-9b-it
         completion = groq_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="gemma2-9b-it",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -61,19 +61,17 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # Access the message content object safely via verified indexing structure path
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
             return "api error: empty text stream returned"
             
         bot_response = bot_response.strip()
-        
-        # RESTORED: Groq uses OpenAI SDK framework formatting, which requires 'assistant' role tags
         user_histories[user_id].append({"role": "assistant", "content": bot_response})
         return bot_response
         
     except Exception as e:
+        # Expose the raw error string directly to your chat so we see any hidden issues instantly
         return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
@@ -91,7 +89,7 @@ def handle_all_messages(message):
 
 # --- RENDER PORT BINDING STUB ---
 def keep_port_alive():
-    """Binds to Render's required port with proper protocol formatting specs."""
+    """Binds to Render's required port so the container health check passes perfectly."""
     port = int(os.environ.get("PORT", 10000))
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
