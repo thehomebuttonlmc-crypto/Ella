@@ -11,7 +11,7 @@ from groq import Groq
 TELEGRAM_TOKEN = "8732284371:AAHK1u9fHgq2rpbwPN00uUYgxmq1Rx2WXjs".replace(" ", "").strip()
 GROQ_API_KEY = "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".replace(" ", "").strip()
 
-# Initialize Production Engines
+# Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using the verified production model ID."""
+    """Sends requests to Groq using the verified active llama-3.3-70b-versatile model ID."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,12 +41,10 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Prune old logs to protect Render memory space limits
     if len(user_histories[user_id]) > 21:
-        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
+        user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
     try:
-        # FIXED: Using a verified active Groq production model name
         completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=user_histories[user_id],
@@ -58,9 +56,7 @@ def ask_groq_direct(user_id, new_message):
         
         bot_response = completion.choices.message.content
         
-        # Verify content returned properly
         if not bot_response or not bot_response.strip():
-            print("Warning: Groq API client yielded a blank text stream block.")
             return "idk what to say right now tbh"
             
         bot_response = bot_response.strip()
@@ -97,7 +93,6 @@ def keep_port_alive():
     try:
         server.bind(("0.0.0.0", port))
         server.listen(1)
-        print(f"Port stub active on port {port}. Health check parsing configured.")
         while True:
             client, addr = server.accept()
             client.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
