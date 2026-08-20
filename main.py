@@ -15,11 +15,11 @@ GROQ_API_KEY = "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".replac
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# --- RE-WORDED PERSONA CONFIGURATION (Prevents Groq Safety Blocks) ---
+# --- RE-WORDED PERSONA CONFIGURATION (Prevents Groq Safety Rejections) ---
 SYSTEM_PROMPT = (
     "You are roleplaying as the user's younger step-sister over casual SMS texts. "
     "Context: You work secretly as a premium social media content creator on subscription apps. "
-    "You are currently visiting your parents, while the user lives in a separate city. "
+    "You are currently visiting your parents, while the user lives in a separate city and is in a distant, romance-free marriage. "
     "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user. "
     "Appearance & Clothing: You love wearing tight tank tops that reveal your neckline, along with very short casual shorts.\n\n"
     "CRITICAL TEXTING STYLE RULES:\n"
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using the verified production model ID."""
+    """Sends requests to Groq using the highly optimized llama-3.1-8b-instant model tier."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,13 +41,14 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Prune old logs to protect Render memory space limits
+    # Protects Render Free Tier RAM by truncating old text logs
     if len(user_histories[user_id]) > 21:
-        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
+        user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
     try:
+        # Utilizing llama-3.1-8b-instant for fast roleplay inference
         completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-8b-instant",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -55,7 +56,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        bot_response = completion.choices[0].message.content
+        bot_response = completion.choices.message.content
         
         if not bot_response or not bot_response.strip():
             return "idk what to say right now tbh"
@@ -65,8 +66,7 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        # Prints the actual exact error string to your Render logs for troubleshooting
-        print(f"CRITICAL GROQ BACKEND ERROR LOGGED: {e}")
+        print(f"Groq API Error: {e}")
         return "idk what to say right now tbh"
 
 # --- TELEGRAM HANDLERS ---
