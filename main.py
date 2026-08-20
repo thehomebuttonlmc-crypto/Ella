@@ -41,9 +41,9 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Prune chat history logs to ensure compliance with free-tier parameter boundaries
+    # FIXED: Clean truncation logic that maintains standard flat list structures without nesting arrays
     if len(user_histories[user_id]) > 21:
-        # Fixed list concatenation slice to maintain clean array list structures
+        # Keep the system instruction at index 0, and append only the last 20 messages
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
     try:
@@ -57,7 +57,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # FIXED: Correctly index choices[0] before accessing .message.content
+        # Access the message content object safely via index selection
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
