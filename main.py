@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b ID."""
+    """Sends requests directly to Groq using the verified active model format."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,12 +41,12 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Prune chat history logs to ensure compliance with free-tier parameter boundaries
+    # Prune chat history logs to protect memory space limits
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
     try:
-        # VERIFIED PRODUCTION MODEL CALL
+        # VERIFIED PRODUCTION ACTIVE MODEL ID
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -66,7 +66,7 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        # Transparent error output layer forwarded directly to Telegram to bypass hidden looping strings
+        # Transparent error output layer forwarded directly to Telegram to bypass hidden loops
         return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
@@ -86,7 +86,8 @@ def handle_all_messages(message):
 def keep_port_alive():
     """Binds to Render's required port so the container health check passes perfectly."""
     port = int(os.environ.get("PORT", 10000))
-    server = socket.socket(socket.AF_INET, socket.socket(socket.AF_STREAM))
+    # FIXED: Using the accurate SOCK_STREAM initialization format
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         server.bind(("0.0.0.0", port))
