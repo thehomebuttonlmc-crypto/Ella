@@ -8,11 +8,10 @@ from threading import Thread
 from groq import Groq
 
 # --- FORCE SANITIZED CREDENTIALS ---
-# Hardcoded directly using your exact active API credentials to prevent any dashboard parsing errors
 TELEGRAM_TOKEN = "8732284371:AAHK1u9fHgq2rpbwPN00uUYgxmq1Rx2WXjs".replace(" ", "").strip()
 GROQ_API_KEY = "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".replace(" ", "").strip()
 
-# Initialize Engines directly without problematic production Flask or Gunicorn worker layers
+# Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
@@ -21,7 +20,8 @@ SYSTEM_PROMPT = (
     "You are roleplaying as the user's step-sister over text messages. "
     "Context: You are secretly an OnlyFans model. You are currently staying with your parents, "
     "while the user lives in another city and is in a sexless marriage. "
-    "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user.\n\n"
+    "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user. "
+    "Appearance & Clothing: You love wearing tight tank tops that reveal your cleavage, along with very short shorts.\n\n"
     "CRITICAL TEXTING STYLE RULES:\n"
     "1. ABSOLUTELY NO narrative descriptions, actions, or context (No *blushes*, *smiles*, or parentheses).\n"
     "2. Use 100% lowercase letters. Do not capitalize the first letter of sentences or the word 'i'.\n"
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using a stable, highly compatible model tier (mixtral-8x7b-32768)."""
+    """Sends requests to Groq using the highly optimized and fully supported gemma2-9b-it model tier."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,26 +41,24 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Protects Render Free Tier RAM limits by tracking only the last 20 messages
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
     try:
-        # Switched to mixtral-8x7b-32768 for stable, error-free API responses
+        # Utilizing gemma2-9b-it for stable 2026 free tier operations
         completion = groq_client.chat.completions.create(
-            model="mixtral-8x7b-32768",
+            model="gemma2-9b-it",
             messages=user_histories[user_id],
-            temperature=0.8,
+            temperature=0.85,
             max_tokens=150,
-            top_p=0.9,
+            top_p=0.95,
             stream=False
         )
         
         bot_response = completion.choices.message.content
         
-        # VALIDATION LAYER: Check if the API returned an empty or invalid content string
         if not bot_response or not bot_response.strip():
-            print("Warning: Groq returned a blank text response string.")
+            print("Warning: Groq API client yielded a blank text stream block.")
             return "idk what to say right now tbh"
             
         bot_response = bot_response.strip()
@@ -68,7 +66,7 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        print(f"Groq API Error: {e}")
+        print(f"Groq API Error Encountered: {e}")
         return "idk what to say right now tbh"
 
 # --- TELEGRAM HANDLERS ---
@@ -83,7 +81,6 @@ def handle_all_messages(message):
     
     reply_text = ask_groq_direct(user_id, user_text)
     
-    # CRITICAL INJECTION: Final runtime protection against empty text executions
     if reply_text and reply_text.strip():
         bot.send_message(user_id, reply_text)
     else:
@@ -100,7 +97,6 @@ def keep_port_alive():
         server.listen(1)
         print(f"Port stub active on port {port}. Health check parsing configured.")
         while True:
-            # Silently accept incoming health check signals from Render's proxy
             client, addr = server.accept()
             client.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
             client.close()
@@ -109,7 +105,6 @@ def keep_port_alive():
 
 # --- INITIALIZATION EXECUTION ---
 if __name__ == "__main__":
-    # Start the port listener in a background thread to satisfy Render's health engine
     port_thread = Thread(target=keep_port_alive)
     port_thread.daemon = True
     port_thread.start()
@@ -120,6 +115,5 @@ if __name__ == "__main__":
     except:
         pass
     
-    # Run long polling directly on the main process thread so Render stays alive endlessly
     print("Bot is now listening for messages 24/7...")
     bot.polling(none_stop=True, interval=0, timeout=20)
