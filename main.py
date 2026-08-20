@@ -9,17 +9,14 @@ from threading import Thread
 from groq import Groq
 
 # --- CREDENTIAL CONFIGURATIONS ---
-# 1. Try to read from Render's environment dashboard variables layout
-TELEGRAM_TOKEN = os.environ.get("8655360798:AAG3G_gTAEPMdTfzgjpiZnD5ih7SsOUZrVc")
-GROQ_API_KEY = os.environ.get("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")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# 2. FAIL-SAFE FALLBACK: If Render fails to read the variables, hardcode them directly here
 if not TELEGRAM_TOKEN:
     TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E"
 
 if not GROQ_API_KEY:
-    # REPLACE THIS STRING WITH YOUR ACTUAL GROQ API KEY (starts with gsk_)
-    GROQ_API_KEY = "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"
+    GROQ_API_KEY = "YOUR_REAL_GROQ_API_KEY_HERE" # Paste your gsk_ key string here
 
 # Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
@@ -51,7 +48,6 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Protects Render Free Tier RAM by truncating old text logs (keeps last 20 messages)
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
@@ -90,21 +86,27 @@ def handle_all_messages(message):
 def home():
     return "Bot running smoothly on Groq engine!"
 
-def run_flask():
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-# --- INITIALIZATION EXECUTION ---
-if __name__ == "__main__":
-    flask_thread = Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    print("Telegram bot starting...")
-    bot.remove_webhook()  # Clears conflicting hooks
+# --- FIXED BROADCAST METHOD FOR GUNICORN RUNTIME ---
+def start_bot_polling():
+    """Wipes webhook conflicts and continuously polls Telegram for updates in a separate thread context."""
+    print("Telegram polling thread starting safely...")
+    try:
+        bot.remove_webhook()
+    except:
+        pass
     
     while True:
         try:
             bot.polling(none_stop=True, interval=0, timeout=20)
         except Exception as e:
-            print(f"Polling loop error: {e}")
+            print(f"Polling loop crash caught: {e}")
             time.sleep(5)
+
+# FIXED: Spawn the listener directly during Flask loading sequence instead of inside __main__
+polling_thread = Thread(target=start_bot_polling)
+polling_thread.daemon = True
+polling_thread.start()
+
+# Fallback hook mapping block for local execution run checks
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
