@@ -41,8 +41,9 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Prune chat history logs to protect memory space limits
+    # Prune chat history logs to ensure compliance with free-tier parameter boundaries
     if len(user_histories[user_id]) > 21:
+        # Fixed list concatenation slice to maintain clean array list structures
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
     try:
@@ -56,7 +57,8 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        bot_response = completion.choices.message.content
+        # FIXED: Correctly index choices[0] before accessing .message.content
+        bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
             return "api error: empty text stream returned"
@@ -66,7 +68,6 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        # Transparent error output layer forwarded directly to Telegram to bypass hidden loops
         return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
@@ -86,7 +87,6 @@ def handle_all_messages(message):
 def keep_port_alive():
     """Binds to Render's required port so the container health check passes perfectly."""
     port = int(os.environ.get("PORT", 10000))
-    # FIXED: Using the accurate SOCK_STREAM initialization format
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
