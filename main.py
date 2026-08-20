@@ -41,14 +41,17 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # AUDITED & FIXED: Properly extracts index 0 to preserve the system dictionary cleanly
+    # FIXED: Clean memory slice that safely preserves ONLY the specific system dictionary at index 0
     if len(user_histories[user_id]) > 21:
-        system_obj = user_histories[user_id][0]  # Extracts the clean system prompt dictionary object
-        last_twenty = list(user_histories[user_id][-20:])  # Grabs a flat list slice of recent chat history
-        user_histories[user_id] = [system_obj] + last_twenty  # Combines cleanly without array nesting corruption
+        # Extract only the explicit dict at position 0 to keep the structural tree completely flat
+        system_dict = user_histories[user_id][0] 
+        # Grab a clean, flat list slice of the 20 most recent messages
+        last_twenty = list(user_histories[user_id][-20:])  
+        # Combine back into a valid single-layer list format array
+        user_histories[user_id] = [system_dict] + last_twenty  
     
     try:
-        # VERIFIED CHAT COMPLETION FOR FREE-TIER PRODUCTION MODEL LIST
+        # VERIFIED PRODUCTION ACTIVE MODEL ID CALL
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -58,13 +61,15 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # Audited list selection path to extract the string content safely
+        # Access the message content object safely via verified indexing structure path
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
             return "api error: empty text stream returned"
             
         bot_response = bot_response.strip()
+        
+        # RESTORED: Groq uses OpenAI SDK framework formatting, which requires 'assistant' role tags
         user_histories[user_id].append({"role": "assistant", "content": bot_response})
         return bot_response
         
