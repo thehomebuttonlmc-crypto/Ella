@@ -10,7 +10,7 @@ from groq import Groq
 
 # --- FORCE SANITIZED CREDENTIALS ---
 # This explicitly strips spaces out of the string token directly
-TELEGRAM_TOKEN = "8898856723:AAET7PE1cNAvHLzajeFGXFEfESaKM_9zmTI".replace(" ", "").strip()
+TELEGRAM_TOKEN = "8732284371:AAHK1u9fHgq2rpbwPN00uUYgxmq1Rx2WXjs".replace(" ", "").strip()
 
 # Paste your real Groq API key here (starts with gsk_)
 GROQ_API_KEY = "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".replace(" ", "").strip()
