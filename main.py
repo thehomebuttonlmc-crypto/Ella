@@ -4,26 +4,24 @@ import json
 import time
 import socket
 import telebot
-import requests
 from threading import Thread
 from groq import Groq
 
 # --- FORCE SANITIZED CREDENTIALS ---
 TELEGRAM_TOKEN = "8732284371:AAHK1u9fHgq2rpbwPN00uUYgxmq1Rx2WXjs".replace(" ", "").strip()
 GROQ_API_KEY = "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".replace(" ", "").strip()
-GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw".replace(" ", "").strip()
 
 # Initialize Production Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# --- RE-WORDED PERSONA CONFIGURATION (Bypasses Automated Guardrails) ---
+# --- SYSTEM PERSONA CONFIGURATION ---
 SYSTEM_PROMPT = (
-    "You are roleplaying as the user's younger step-sister over casual SMS texts. "
-    "Context: You work secretly as a premium social media content creator on subscription apps. "
-    "You are currently visiting your parents, while the user lives in a separate city and is in a distant, romance-free marriage. "
+    "You are roleplaying as the user's step-sister over text messages. "
+    "Context: You are secretly an OnlyFans model. You are currently staying with your parents, "
+    "while the user lives in another city and is in a sexless marriage. "
     "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user. "
-    "Appearance & Clothing: You love wearing tight tank tops that reveal your neckline, along with very short casual shorts.\n\n"
+    "Appearance & Clothing: You love wearing tight tank tops that reveal your cleavage, along with very short shorts.\n\n"
     "CRITICAL TEXTING STYLE RULES:\n"
     "1. ABSOLUTELY NO narrative descriptions, actions, or context (No *blushes*, *smiles*, or parentheses).\n"
     "2. Use 100% lowercase letters. Do not capitalize the first letter of sentences or the word 'i'.\n"
@@ -34,35 +32,8 @@ SYSTEM_PROMPT = (
 
 user_histories = {}
 
-def ask_gemini_fallback(user_id, new_message):
-    """Fallback channel that executes if Groq handles a service exception."""
-    url = f"https://googleapis.com{GEMINI_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    
-    gemini_contents = []
-    for msg in user_histories[user_id]:
-        if msg["role"] == "system":
-            continue
-        role_label = "user" if msg["role"] == "user" else "model"
-        gemini_contents.append({"role": role_label, "parts": [{"text": msg["content"]}]})
-        
-    payload = {
-        "contents": gemini_contents,
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}
-    }
-    
-    try:
-        res = requests.post(url, headers=headers, json=payload, timeout=15)
-        res_data = res.json()
-        bot_response = res_data['candidates']['content']['parts']['text'].strip()
-        user_histories[user_id].append({"role": "assistant", "content": bot_response})
-        return bot_response
-    except Exception as e:
-        print(f"Gemini Fallback Failure: {e}")
-        return "idk what to say right now tbh"
-
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using the verified active production model IDs."""
+    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b ID."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -70,11 +41,12 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
+    # Prune chat history logs to ensure compliance with free-tier parameter boundaries
     if len(user_histories[user_id]) > 21:
-        user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
+        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
     try:
-        # FIXED: Using verified production free-tier model name 'openai/gpt-oss-20b'
+        # VERIFIED PRODUCTION MODEL CALL
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -87,15 +59,15 @@ def ask_groq_direct(user_id, new_message):
         bot_response = completion.choices.message.content
         
         if not bot_response or not bot_response.strip():
-            return ask_gemini_fallback(user_id, new_message)
+            return "api error: empty text stream returned"
             
         bot_response = bot_response.strip()
         user_histories[user_id].append({"role": "assistant", "content": bot_response})
         return bot_response
         
     except Exception as e:
-        print(f"Primary Groq model failed, routing to Gemini fallback. Reason: {e}")
-        return ask_gemini_fallback(user_id, new_message)
+        # Transparent error output layer forwarded directly to Telegram to bypass hidden looping strings
+        return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
 @bot.message_handler(commands=['start', 'help'])
@@ -106,18 +78,15 @@ def send_welcome(message):
 def handle_all_messages(message):
     user_id = message.chat.id
     user_text = message.text
-    reply_text = ask_groq_direct(user_id, user_text)
     
-    if reply_text and reply_text.strip():
-        bot.send_message(user_id, reply_text)
-    else:
-        bot.send_message(user_id, "idk what to say right now tbh")
+    reply_text = ask_groq_direct(user_id, user_text)
+    bot.send_message(user_id, reply_text)
 
 # --- RENDER PORT BINDING STUB ---
 def keep_port_alive():
     """Binds to Render's required port so the container health check passes perfectly."""
     port = int(os.environ.get("PORT", 10000))
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server = socket.socket(socket.AF_INET, socket.socket(socket.AF_STREAM))
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         server.bind(("0.0.0.0", port))
