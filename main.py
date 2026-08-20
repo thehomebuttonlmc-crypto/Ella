@@ -9,9 +9,17 @@ from threading import Thread
 from groq import Groq
 
 # --- CREDENTIAL CONFIGURATIONS ---
-# These are pulled securely from Render's Environment Variables
+# 1. Try to read from Render's environment dashboard variables layout
 TELEGRAM_TOKEN = os.environ.get("8655360798:AAG3G_gTAEPMdTfzgjpiZnD5ih7SsOUZrVc")
 GROQ_API_KEY = os.environ.get("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")
+
+# 2. FAIL-SAFE FALLBACK: If Render fails to read the variables, hardcode them directly here
+if not TELEGRAM_TOKEN:
+    TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E"
+
+if not GROQ_API_KEY:
+    # REPLACE THIS STRING WITH YOUR ACTUAL GROQ API KEY (starts with gsk_)
+    GROQ_API_KEY = "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"
 
 # Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
@@ -43,7 +51,7 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Protects Render Free Tier RAM by truncating old text logs
+    # Protects Render Free Tier RAM by truncating old text logs (keeps last 20 messages)
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
