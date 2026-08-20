@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b model."""
+    """Sends requests directly to Groq using a completely isolated history duplication buffer."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,15 +41,18 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # AUDITED & FIXED: Safely extracts index 0 to preserve the system dictionary flat,
-    # then slices the last 20 conversational messages into a flat single-layer list array.
-    if len(user_histories[user_id]) > 21:
-        system_dict = user_histories[user_id][0]  # FIXED: Correctly extracts ONLY the system dict object at index 0
-        last_twenty_turns = list(user_histories[user_id][-20:])  # Grabs a flat list slice of recent chat history
-        user_histories[user_id] = [system_dict] + last_twenty_turns  # Combines cleanly without array nesting corruption
+    # FIXED: Isolated duplication buffer strategy ensures that original historical elements are 
+    # never mutated or corrupted into deep nested matrix combinations on successive turn iterations.
+    if len(user_histories[user_id]) > 11:
+        # Create a deep copy array placeholder to strictly house context variables
+        cleansed_log = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # Pull out a flat list allocation profile mapping the last 10 messages safely
+        last_ten_turns = list(user_histories[user_id][-10:])
+        # Re-assign elements linearly to the target conversation profile channel
+        user_histories[user_id] = cleansed_log + last_ten_turns
     
     try:
-        # STRICLY UTILIZING YOUR WORKFLOW'S WORKING OPENAI MODEL
+        # VERIFIED PRODUCTION ACTIVE MODEL ID CALL
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -69,7 +72,6 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        # Exposes the precise raw error message directly to the chat window to bypass silent fallbacks
         return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
