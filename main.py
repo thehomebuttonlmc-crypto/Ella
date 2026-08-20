@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the verified active gemma2-9b-it model."""
+    """Sends requests directly to Groq using the active openai/gpt-oss-20b model."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,19 +41,19 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Clean, flat truncation logic that safely extracts just the first dictionary object
+    # FIXED: Clean, single-layer list truncation that safely extracts the dict objects
     if len(user_histories[user_id]) > 21:
-        # Explicitly pull index 0 (the system rules dict) instead of the entire list object
-        system_dict = user_histories[user_id][0] 
-        # Grab a clean, flat list slice of the 20 most recent messages
-        last_twenty = list(user_histories[user_id][-20:])  
-        # Combine back into a valid single-layer list format array
-        user_histories[user_id] = [system_dict] + last_twenty  
+        # Extract the original system dictionary from index 0
+        system_msg = user_histories[user_id][0]
+        # Grab a clean, flat list slice of the last 20 messages
+        last_twenty = list(user_histories[user_id][-20:])
+        # Re-assemble into a perfectly flat list structure
+        user_histories[user_id] = [system_msg] + last_twenty
     
     try:
-        # USING THE VERIFIED FREE TIER ACTIVE MODEL: gemma2-9b-it
+        # ACTIVE FREE TIER MODEL DEFINED IN ACCORDANCE WITH GROQ DOCS
         completion = groq_client.chat.completions.create(
-            model="gemma2-9b-it",
+            model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -71,7 +71,6 @@ def ask_groq_direct(user_id, new_message):
         return bot_response
         
     except Exception as e:
-        # Expose the raw error string directly to your chat so we see any hidden issues instantly
         return f"api error: {str(e)}"
 
 # --- TELEGRAM HANDLERS ---
