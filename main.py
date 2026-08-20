@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using a completely isolated history duplication buffer."""
+    """Sends requests directly to Groq using a completely isolated history array."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,8 +41,7 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Isolated duplication buffer strategy ensures that original historical elements are 
-    # never mutated or corrupted into deep nested matrix combinations on successive turn iterations.
+    # Clean memory truncation that keeps the array completely flat
     if len(user_histories[user_id]) > 11:
         # Create a deep copy array placeholder to strictly house context variables
         cleansed_log = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -52,7 +51,6 @@ def ask_groq_direct(user_id, new_message):
         user_histories[user_id] = cleansed_log + last_ten_turns
     
     try:
-        # VERIFIED PRODUCTION ACTIVE MODEL ID CALL
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -62,6 +60,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
+        # FIXED: Added the required index [0] to extract the text content safely from the list
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
