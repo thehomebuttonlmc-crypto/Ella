@@ -6,97 +6,97 @@ import requests
 import telebot
 from flask import Flask
 from threading import Thread
+from groq import Groq
 
 # --- CREDENTIAL CONFIGURATIONS ---
-TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E"
-GEMINI_API_KEY = "AQ.Ab8RN6IPcUnMitd2F-BCNxh50F2CCQwxmoRWAmeYwiHjYDLWpw"
+# These are pulled securely from Render's Environment Variables
+TELEGRAM_TOKEN = os.environ.get("8655360798:AAG3G_gTAEPMdTfzgjpiZnD5ih7SsOUZrVc")
+GROQ_API_KEY = os.environ.get("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")
 
-# Initialize Engines (threaded=False blocks duplicate thread connection loop errors)
+# Initialize Engines
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 # --- SYSTEM PERSONA CONFIGURATION ---
 SYSTEM_PROMPT = (
     "You are roleplaying as the user's step-sister over text messages. "
     "Context: You are secretly an OnlyFans model. You are currently staying with your parents, "
     "while the user lives in another city and is in a sexless marriage. "
-    "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user. "
-    "\n\n"
+    "Personality: You are a little shy, tentative, and submissive, but comfortable texting the user.\n\n"
     "CRITICAL TEXTING STYLE RULES:\n"
     "1. ABSOLUTELY NO narrative descriptions, actions, or context (No *blushes*, *smiles*, or parentheses).\n"
     "2. Use 100% lowercase letters. Do not capitalize the first letter of sentences or the word 'i'.\n"
     "3. NEVER use a period (.) at the very end of your final sentence.\n"
-    "4. Use casual modern text slang, abbreviations, and shortcuts naturally but sparingly (e.g., 'idk', 'omg', 'u', 'r', 'im', 'tbh').\n"
+    "4. Use casual modern text slang, abbreviations, and shortcuts naturally but sparingly (e.g., idk, omg, u, r, im, tbh).\n"
     "5. Keep responses short and conversational, usually 1 to 3 quick sentences max."
 )
 
 user_histories = {}
 
-def ask_gemini_direct_raw(user_id, new_message):
-    """Sends requests directly to Google's endpoints using the tested data dictionary path layer."""
-    # FIXED: Re-built the URL layout path to cleanly separate the domain and your key parameters safely
-    url = f"https://googleapis.com{GEMINI_API_KEY}"
-    
+def ask_groq_direct(user_id, new_message):
+    """Sends requests to Groq using the highly optimized llama-3.3-70b-versatile model."""
     if user_id not in user_histories:
-        user_histories[user_id] = []
+        user_histories[user_id] = [
+            {"role": "system", "content": SYSTEM_PROMPT}
+        ]
         
-    user_histories[user_id].append({"role": "user", "parts": [{"text": new_message}]})
+    user_histories[user_id].append({"role": "user", "content": new_message})
     
-    payload = {
-        "contents": user_histories[user_id],
-        "systemInstruction": {
-            "parts": [{"text": SYSTEM_PROMPT}]
-        },
-        "generationConfig": {
-            "temperature": 0.9,
-            "maxOutputTokens": 100
-        }
-    }
+    # Protects Render Free Tier RAM by truncating old text logs
+    if len(user_histories[user_id]) > 21:
+        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
     
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers, timeout=20)
-    
-    if response.status_code == 200:
-        res_json = response.json()
-        try:
-            bot_reply = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
-            user_histories[user_id].append({"role": "model", "parts": [{"text": bot_reply}]})
-            return bot_reply
-        except (KeyError, IndexError, TypeError) as parse_err:
-            raise Exception(f"Unexpected JSON data layout response: {parse_err} | Full JSON payload response: {res_json}")
-    else:
-        raise Exception(f"API Error {response.status_code}: {response.text}")
+    try:
+        completion = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=user_histories[user_id],
+            temperature=0.8,
+            max_tokens=150,
+            top_p=0.9,
+            stream=False
+        )
+        
+        bot_response = completion.choices.message.content.strip()
+        user_histories[user_id].append({"role": "assistant", "content": bot_response})
+        return bot_response
+        
+    except Exception as e:
+        print(f"Groq API Error: {e}")
+        return "idk what to say right now tbh"
 
+# --- TELEGRAM HANDLERS ---
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    bot.reply_to(message, "hey...")
+
+@bot.message_handler(func=lambda message: True)
+def handle_all_messages(message):
+    user_id = message.chat.id
+    user_text = message.text
+    reply_text = ask_groq_direct(user_id, user_text)
+    bot.send_message(user_id, reply_text)
+
+# --- WEBHOOK / FLASK HEALTH CHECK ---
 @app.route('/')
 def home():
-    return "Bot is online!", 200
+    return "Bot running smoothly on Groq engine!"
 
-# --- BOT CORE PROCESSING ROUTINE ---
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    try:
-        user_id = message.from_user.id
-        reply_text = ask_gemini_direct_raw(user_id, message.text)
-        bot.reply_to(message, reply_text)
-    except Exception as e:
-        print(f"DESKTOP RUNTIME ERROR: {e}", file=sys.stderr)
-        bot.reply_to(message, "hey sorry, my phone is acting up rn...")
+def run_flask():
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
-def run_flask_bridge():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
-
+# --- INITIALIZATION EXECUTION ---
 if __name__ == "__main__":
-    bot.remove_webhook()
-    Thread(target=run_flask_bridge).start()
-    print("Bot is successfully polling on Render cloud infrastructure...")
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
     
-    offset = 0
+    print("Telegram bot starting...")
+    bot.remove_webhook()  # Clears conflicting hooks
+    
     while True:
         try:
-            updates = bot.get_updates(offset=offset, timeout=10, allowed_updates=["message"])
-            for update in updates:
-                bot.process_new_updates([update])
-                offset = update.update_id + 1
+            bot.polling(none_stop=True, interval=0, timeout=20)
         except Exception as e:
-            time.sleep(2)
+            print(f"Polling loop error: {e}")
+            time.sleep(5)
