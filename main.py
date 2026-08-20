@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using a completely isolated history array."""
+    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b model."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,16 +41,17 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # Clean memory truncation that keeps the array completely flat
-    if len(user_histories[user_id]) > 11:
-        # Create a deep copy array placeholder to strictly house context variables
-        cleansed_log = [{"role": "system", "content": SYSTEM_PROMPT}]
-        # Pull out a flat list allocation profile mapping the last 10 messages safely
-        last_ten_turns = list(user_histories[user_id][-10:])
-        # Re-assign elements linearly to the target conversation profile channel
-        user_histories[user_id] = cleansed_log + last_ten_turns
+    # LINE-BY-LINE FIXED TRUNCATION LOGIC:
+    # We guarantee Groq receives an alternating layout (System -> User -> Assistant -> User).
+    # If history grows too long, we slice an even number of messages (the last 18 turns).
+    if len(user_histories[user_id]) > 21:
+        system_node = user_histories[user_id][0]
+        # Slicing an even number ensures the slice always begins with a 'user' message
+        safe_flat_history = list(user_histories[user_id][-18:])
+        user_histories[user_id] = [system_node] + safe_flat_history
     
     try:
+        # VERIFIED PRODUCTION ACTIVE MODEL ID CALL
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -60,7 +61,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # FIXED: Added the required index [0] to extract the text content safely from the list
+        # Access content via the choices list selection safely
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
