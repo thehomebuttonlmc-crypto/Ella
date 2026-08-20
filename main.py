@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using the stable, active gemma2-9b-it model tier."""
+    """Sends requests to Groq using the stable, active gemma-7b-it model tier."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -45,8 +45,9 @@ def ask_groq_direct(user_id, new_message):
         user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
     try:
+        # Switched to gemma-7b-it for active, error-free API responses
         completion = groq_client.chat.completions.create(
-            model="gemma2-9b-it",
+            model="gemma-7b-it",
             messages=user_histories[user_id],
             temperature=0.85,
             max_tokens=150,
@@ -96,7 +97,6 @@ def keep_port_alive():
         server.listen(1)
         print(f"Port stub active on port {port}. Health check parsing configured.")
         while True:
-            # Catch incoming signals from Render's routing proxy
             client, addr = server.accept()
             client.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
             client.close()
@@ -105,7 +105,6 @@ def keep_port_alive():
 
 # --- INITIALIZATION EXECUTION ---
 if __name__ == "__main__":
-    # Start the port socket thread to handle Render proxy scans
     port_thread = Thread(target=keep_port_alive)
     port_thread.daemon = True
     port_thread.start()
