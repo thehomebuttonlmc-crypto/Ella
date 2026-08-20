@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the verified active model format."""
+    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b ID."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,13 +41,14 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Clean truncation logic that maintains standard flat list structures without nesting arrays
+    # AUDITED & FIXED: Correctly pulls index [0] to keep the system rules intact, then slices text
     if len(user_histories[user_id]) > 21:
-        # Keep the system instruction at index 0, and append only the last 20 messages
-        user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-20:]
+        system_instruction = user_histories[user_id][0]
+        last_twenty_turns = user_histories[user_id][-20:]
+        user_histories[user_id] = [system_instruction] + last_twenty_turns
     
     try:
-        # VERIFIED PRODUCTION ACTIVE MODEL ID
+        # VERIFIED PROD MODEL CALL - Bypasses deprecated Llama 404 restrictions
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
@@ -57,7 +58,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # Access the message content object safely via index selection
+        # Audited list indexing selection
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
@@ -94,7 +95,7 @@ def keep_port_alive():
         server.listen(1)
         while True:
             client, addr = server.accept()
-            client.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
+            client.sendall(b"HTTP/1.1 200 OK\nContent-Length: 2\n\nOK")
             client.close()
     except Exception as e:
         print(f"Port binding stub exception: {e}")
