@@ -7,12 +7,11 @@ import telebot
 from groq import Groq
 
 # --- FORCE SANITIZED CREDENTIALS ---
-TELEGRAM_TOKEN = "8655360798:AAEm53g1_PmHL-25fuMqPekxN1PODrnZs8E".replace(" ", "").strip()
-
-# PLACE YOUR REAL GROQ API KEY HERE (starts with gsk_)
+# Hardcoded directly using your exact active API credentials to prevent any dashboard parsing errors
+TELEGRAM_TOKEN = "8732284371:AAHK1u9fHgq2rpbwPN00uUYgxmq1Rx2WXjs".replace(" ", "").strip()
 GROQ_API_KEY = "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".replace(" ", "").strip()
 
-# Initialize Engines directly without Flask layers
+# Initialize Engines directly without problematic production Flask or Gunicorn worker layers
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
@@ -33,7 +32,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests to Groq using the highly optimized llama-3.3-70b-versatile model."""
+    """Sends requests to Groq using the updated 2026 production model standard (openai/gpt-oss-120b)."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,12 +40,14 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
+    # Protects Render Free Tier RAM limits by tracking only the last 20 messages
     if len(user_histories[user_id]) > 21:
         user_histories[user_id] = [user_histories[user_id]] + user_histories[user_id][-20:]
     
     try:
+        # Utilizing openai/gpt-oss-120b for high-quality instruction adherence and rapid inference
         completion = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -54,7 +55,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        bot_response = completion.choices.message.content.strip()
+        bot_response = completion.choices[0].message.content.strip()
         user_histories[user_id].append({"role": "assistant", "content": bot_response})
         return bot_response
         
@@ -82,6 +83,6 @@ if __name__ == "__main__":
     except:
         pass
     
-    # Run long polling directly on the main thread so Render can never close it
+    # Run long polling directly on the main process thread so Render stays alive endlessly
     print("Bot is now listening for messages 24/7...")
     bot.polling(none_stop=True, interval=0, timeout=20)
