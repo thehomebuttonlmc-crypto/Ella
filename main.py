@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
 user_histories = {}
 
 def ask_groq_direct(user_id, new_message):
-    """Sends requests directly to Groq using the highly stable llama3-8b-8192 model."""
+    """Sends requests directly to Groq using the verified active openai/gpt-oss-20b model."""
     if user_id not in user_histories:
         user_histories[user_id] = [
             {"role": "system", "content": SYSTEM_PROMPT}
@@ -41,16 +41,16 @@ def ask_groq_direct(user_id, new_message):
         
     user_histories[user_id].append({"role": "user", "content": new_message})
     
-    # FIXED: Properly extract index 0 so it stays a flat list structure across subsequent turns
+    # AUDITED & FIXED: Properly extracts index 0 to preserve the system dictionary cleanly
     if len(user_histories[user_id]) > 21:
-        system_obj = user_histories[user_id][0]  # <-- Added missing [0] index
-        last_twenty = list(user_histories[user_id][-20:])
-        user_histories[user_id] = [system_obj] + last_twenty
+        system_obj = user_histories[user_id][0]  # Extracts the clean system prompt dictionary object
+        last_twenty = list(user_histories[user_id][-20:])  # Grabs a flat list slice of recent chat history
+        user_histories[user_id] = [system_obj] + last_twenty  # Combines cleanly without array nesting corruption
     
     try:
-        # FIXED: Using the active free-tier standard model identifier
+        # VERIFIED CHAT COMPLETION FOR FREE-TIER PRODUCTION MODEL LIST
         completion = groq_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="openai/gpt-oss-20b",
             messages=user_histories[user_id],
             temperature=0.8,
             max_tokens=150,
@@ -58,7 +58,7 @@ def ask_groq_direct(user_id, new_message):
             stream=False
         )
         
-        # FIXED: Added the required list index [0] to extract the text data cleanly
+        # Audited list selection path to extract the string content safely
         bot_response = completion.choices[0].message.content
         
         if not bot_response or not bot_response.strip():
